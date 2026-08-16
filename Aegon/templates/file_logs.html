@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Aegon-File Activity</title>
+
+<style>
+body {
+    margin: 0;
+    padding: 40px;
+    background: linear-gradient(135deg, #141e30, #243b55);
+    font-family: Arial;
+    color: white;
+}
+
+h2 {
+    margin-bottom: 25px;
+}
+
+.table-container {
+    background: rgba(255,255,255,0.08);
+    backdrop-filter: blur(10px);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+th, td {
+    padding: 14px;
+    text-align: left;
+    word-wrap: break-word;
+}
+
+th {
+    background: rgba(0,0,0,0.4);
+}
+
+tr {
+    border-bottom: 1px solid rgba(255,255,255,0.15);
+}
+
+tr:hover {
+    background: rgba(0,0,0,0.3);
+}
+
+th:nth-child(1), td:nth-child(1) { width: 25%; }
+th:nth-child(2), td:nth-child(2) { width: 20%; }
+th:nth-child(3), td:nth-child(3) { width: 55%; }
+
+.back-btn {
+    margin-top: 20px;
+    padding: 8px 16px;
+    border-radius: 6px;
+    background: #00c6ff;
+    color: white;
+    text-decoration: none;
+}
+.back-btn:hover {
+    background: #0072ff;
+}
+</style>
+</head>
+
+<body>
+
+<h2>Activity for: {{filename}}</h2>
+
+<div class="table-container">
+<table>
+<tr>
+    <th>User</th>
+    <th>Action</th>
+    <th>Timestamp</th>
+</tr>
+
+{% for log in logs %}
+<tr>
+    <td>{{log[0]}}</td>
+    <td>{{log[1]}}</td>
+    <td>{{log[2]}}</td>
+</tr>
+{% endfor %}
+
+</table>
+</div>
+
+<br>
+<a href="/dashboard" class="back-btn">Back to Dashboard</a>
+
+</body>
+</html>

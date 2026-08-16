@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Secure Excel Viewer</title>
+
+<style>
+body {
+    margin: 0;
+    background: #111;
+    color: white;
+    padding: 40px;
+    font-family: Arial;
+    overflow-x: hidden;
+}
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+    background: rgba(255,255,255,0.05);
+}
+
+td, th {
+    border: 1px solid rgba(255,255,255,0.3);
+    padding: 8px;
+}
+
+tr:hover {
+    background: rgba(255,255,255,0.1);
+}
+
+/* Animated Watermark */
+#watermark {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.12;
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    grid-template-rows: repeat(8, 1fr);
+    font-size: 16px;
+    transform: rotate(-20deg);
+    animation: moveWM 20s linear infinite;
+    z-index: 1000;
+}
+
+.wm {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+@keyframes moveWM {
+    0%   { transform: translate(0px, 0px) rotate(-20deg); }
+    50%  { transform: translate(80px, 40px) rotate(-20deg); }
+    100% { transform: translate(0px, 0px) rotate(-20deg); }
+}
+</style>
+</head>
+
+<body>
+
+<div id="watermark"></div>
+
+<h2>Excel Sheet View</h2>
+
+<table>
+{% for row in data %}
+<tr>
+    {% for cell in row %}
+        <td>{{ cell }}</td>
+    {% endfor %}
+</tr>
+{% endfor %}
+</table>
+
+<script>
+const wm = document.getElementById("watermark");
+const user = "{{ session['user'] }}";
+
+function generateWatermark() {
+    wm.innerHTML = "";
+    const now = new Date();
+    const stamp = now.toLocaleDateString() + " | " + now.toLocaleTimeString();
+
+    for (let i = 0; i < 48; i++) {
+        const s = document.createElement("div");
+        s.className = "wm";
+        s.innerText = user + " | " + stamp;
+        wm.appendChild(s);
+    }
+}
+
+generateWatermark();
+setInterval(generateWatermark, 5000);
+</script>
+
+</body>
+</html>

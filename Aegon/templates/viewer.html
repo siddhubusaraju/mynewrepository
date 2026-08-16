@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Aegon Secure Viewer</title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.21/mammoth.browser.min.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            background: #111;
+            font-family: Arial;
+            overflow: auto;
+        }
+
+        /* Main container */
+        #viewer {
+            position: relative;
+            padding: 40px 0;
+            display: flex;
+            justify-content: center;
+            width: 100%;
+        }
+
+        /* PDF container */
+        #pdf-container {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        /* Canvas styling */
+        canvas {
+            display: block;
+            margin: 0 auto 40px auto;
+            filter: invert(1) hue-rotate(180deg);
+        }
+
+        /* Clean Professional Watermark */
+        #watermark {
+            position: fixed;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            pointer-events: none;
+
+            font-size: 28px;
+            /* smaller */
+            font-weight: 700;
+            color: rgba(255, 255, 255, 0.16);
+
+            transform: rotate(-25deg);
+
+            display: flex;
+            flex-wrap: wrap;
+            align-content: center;
+            justify-content: center;
+
+            gap: 60px 120px;
+            /* tighter spacing */
+
+            animation: drift 30s linear infinite;
+
+            z-index: 9999;
+        }
+
+        @keyframes drift {
+            0% {
+                transform: translate(0, 0) rotate(-25deg);
+            }
+
+            50% {
+                transform: translate(60px, 40px) rotate(-25deg);
+            }
+
+            100% {
+                transform: translate(0, 0) rotate(-25deg);
+            }
+        }
+
+        /* Anti-screenshot obfuscation */
+        .obscured {
+            filter: blur(20px) grayscale(100%) !important;
+            opacity: 0.1;
+            pointer-events: none;
+            transition: all 0.1s ease;
+        }
+
+        /* Disable text selection */
+        * {
+            user-select: none;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="viewer">
+        <div id="pdf-container"></div>
+        <div id="watermark"></div>
+    </div>
+
+    <script>
+
+        // Configure PDF.js worker
+        pdfjsLib.GlobalWorkerOptions.workerSrc =
+            'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+
+        // Disable right-click
+        document.addEventListener("contextmenu", e => e.preventDefault());
+
+        // Anti-Screenshot Measures
+        const secureContainer = document.getElementById("viewer");
+
+        const obscureSecureDocument = () => {
+            secureContainer.classList.add("obscured");
+        };
+
+        const revealSecureDocument = () => {
+            secureContainer.classList.remove("obscured");
+        };
+
+        window.addEventListener("blur", obscureSecureDocument);
+        document.addEventListener("visibilitychange", () => {
+            if (document.hidden) obscureSecureDocument();
+            else revealSecureDocument();
+        });
+        document.addEventListener("mouseleave", obscureSecureDocument);
+        
+        window.addEventListener("focus", revealSecureDocument);
+        document.addEventListener("mouseenter", revealSecureDocument);
+
+        const wipeClipboard = () => {
+            // Fallback for older browsers / if navigator lacks permissions
+            const tempInput = document.createElement("input");
+            tempInput.style.position = "absolute";
+            tempInput.style.left = "-9999px";
+            tempInput.value = "Screenshots are disabled for this sensitive document.";
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            try {
+                document.execCommand("copy");
+            } catch (err) {}
+            document.body.removeChild(tempInput);
+            
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText("Screenshots are disabled for this sensitive document.");
+                }
+            } catch (err) {}
+        };
+
+        document.addEventListener("copy", (e) => {
+            e.preventDefault();
+            if (e.clipboardData) {
+                e.clipboardData.setData("text/plain", "Screenshots are disabled for this sensitive document.");
+            }
+            wipeClipboard();
+        });
+
+        const handlePrtScn = (e) => {
+            if (e.key === "PrintScreen" || e.keyCode === 44 || e.code === "PrintScreen") {
+                wipeClipboard();
+                obscureSecureDocument();
+                // Stay obscured a bit longer for PrtScn
+                setTimeout(() => revealSecureDocument(), 3000); 
+            }
+        };
+
+        const handleKeyDown = (e) => {
+            // Disable default browser shortcuts for save, print, copy
+            if (e.ctrlKey || e.metaKey) {
+                if (e.key === 's' || e.key === 'p' || e.key === 'c' || e.key === 'S' || e.key === 'P' || e.key === 'C') {
+                    e.preventDefault();
+                    wipeClipboard();
+                }
+            }
+            
+            // NEW STRATEGY: Obscure the document on ANY key press!
+            // This guarantees that combinations like Win+PrtScn or Alt+PrtScn 
+            // will blur the screen the exact millisecond the modifier key is pressed.
+            obscureSecureDocument();
+            handlePrtScn(e);
+        };
+
+        const handleKeyUp = (e) => {
+            handlePrtScn(e);
+            
+            // Only reveal if it wasn't the PrintScreen key, 
+            // and add a small delay so the screenshot captures the blurred state.
+            if (e.key !== "PrintScreen" && e.keyCode !== 44 && e.code !== "PrintScreen") {
+                setTimeout(() => {
+                    revealSecureDocument();
+                }, 500);
+            }
+        };
+
+        window.focus();
+        document.body.focus();
+
+        document.addEventListener("keydown", handleKeyDown);
+        document.addEventListener("keyup", handleKeyUp);
+
+        // Load File
+        const url = "/secure_file/{{filename}}";
+        const container = document.getElementById("pdf-container");
+        const ext = url.split('.').pop().toLowerCase();
+
+        const imageExts = ['png', 'jpg', 'jpeg', 'gif', 'webp'];
+        const videoExts = ['mp4', 'webm', 'ogg'];
+
+        if (ext === 'pdf') {
+            pdfjsLib.getDocument(url).promise.then(pdf => {
+                for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                    pdf.getPage(pageNum).then(page => {
+
+                        const scale = 1.4;
+                        const viewport = page.getViewport({ scale: scale });
+
+                        const canvas = document.createElement("canvas");
+                        const context = canvas.getContext("2d");
+
+                        canvas.height = viewport.height;
+                        canvas.width = viewport.width;
+
+                        container.appendChild(canvas);
+
+                        page.render({
+                            canvasContext: context,
+                            viewport: viewport
+                        });
+                    });
+                }
+            });
+        } else if (imageExts.includes(ext)) {
+            const img = document.createElement("img");
+            img.src = url;
+            // Force the image to scale up and take the space, bounded by container's max properties
+            img.style.width = "100%";
+            img.style.height = "85vh";
+            img.style.objectFit = "contain";
+            img.style.display = "block";
+            
+            // Adjust the flex layout to center the image perfectly in the vertical space
+            container.style.justifyContent = "center";
+            container.style.minHeight = "85vh";
+            
+            container.appendChild(img);
+        } else if (videoExts.includes(ext)) {
+            const vid = document.createElement("video");
+            vid.src = url;
+            vid.controls = true;
+            vid.controlsList = "nodownload";
+            vid.style.maxWidth = "100%";
+            vid.style.maxHeight = "85vh";
+            vid.style.display = "block";
+            container.appendChild(vid);
+        } else if (ext === 'txt') {
+            fetch(url)
+                .then(response => response.text())
+                .then(text => {
+                    const pre = document.createElement("pre");
+                    pre.textContent = text;
+                    pre.style.color = "white";
+                    pre.style.padding = "40px";
+                    pre.style.whiteSpace = "pre-wrap";
+                    pre.style.wordWrap = "break-word";
+                    pre.style.maxWidth = "800px";
+                    pre.style.width = "100%";
+                    pre.style.boxSizing = "border-box";
+                    container.appendChild(pre);
+                });
+        } else if (ext === 'docx') {
+            fetch(url)
+                .then(response => response.arrayBuffer())
+                .then(arrayBuffer => mammoth.convertToHtml({arrayBuffer: arrayBuffer}))
+                .then(result => {
+                    const div = document.createElement("div");
+                    div.innerHTML = result.value;
+                    div.style.background = "white";
+                    div.style.color = "black";
+                    div.style.padding = "40px";
+                    div.style.fontFamily = "Arial, sans-serif";
+                    div.style.maxWidth = "800px";
+                    div.style.width = "100%";
+                    div.style.boxSizing = "border-box";
+                    div.style.borderRadius = "8px";
+                    container.appendChild(div);
+                })
+                .catch(err => {
+                    const msg = document.createElement("p");
+                    msg.textContent = "Error loading Word document.";
+                    msg.style.color = "white";
+                    container.appendChild(msg);
+                });
+        } else {
+            const msg = document.createElement("p");
+            msg.textContent = "Preview is not supported for this file type in the secure viewer.";
+            msg.style.color = "white";
+            msg.style.textAlign = "center";
+            msg.style.padding = "40px";
+            msg.style.fontFamily = "Arial, sans-serif";
+            container.appendChild(msg);
+        }
+
+        // Watermark generation
+        const wm = document.getElementById("watermark");
+        const user = "{{session['user']}}";
+
+        function generateWatermark() {
+            wm.innerHTML = "";
+
+            const now = new Date();
+            const stamp = now.toLocaleDateString() + " | " + now.toLocaleTimeString();
+
+            for (let i = 0; i < 40; i++) {   // many more lines
+                const span = document.createElement("span");
+                span.innerText = user + " | " + stamp;
+                wm.appendChild(span);
+            }
+        }
+
+        generateWatermark();
+        setInterval(generateWatermark, 5000);
+
+    </script>
+
+</body>
+
+</html>
